@@ -5,6 +5,8 @@ import Syntax.Elim.Shapeless
 
 set_option pp.fieldNotation.generalized false
 set_option linter.unusedVariables false
+set_option backward.isDefEq.respectTransparency false
+
 
 namespace ChooseExample
 

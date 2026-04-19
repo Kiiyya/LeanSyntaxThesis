@@ -249,12 +249,13 @@ variable {σ₁ : Subst Θ Δ} {σ₂ : Subst Γ Θ}
 @[grind =, grind =_, aesop 20%] theorem Subst.comp_wk : σ ∘ (.wk (W := W) .id) = .wk σ := by
   dsimp [comp, wk, wk, id]
   congr 1
-  rw [SubstE.comp_wki]
+  exact SubstE.comp_wki σ.val
 
+set_option backward.isDefEq.respectTransparency false in
 @[aesop 50%, grind =, grind =_] theorem Ty.subst_wk : A[σ][wki (W := W)] = A[wk σ] := by
   dsimp [Ty.subst, Subst.wki, Subst.wk]
   congr 1
-  simp_all only [SubstE.wki, TyE.subst_comp, SubstE.comp_wki]
+  simp_all only [SubstE.wki, TyE.subst_comp, SubstE.comp_wki σ.val]
 
 @[aesop 5%, grind =] theorem Subst.lift_eq {W : Ty Δ} : Subst.lift σ = Subst.cons (Subst.wk (W := W[σ]) σ) ((.var .vz : Tm _ _).conv (.ofEq Ty.subst_wk)) := by rfl
 
@@ -266,6 +267,7 @@ theorem Subst.left_apply {Γ : Con} {A B : Ty Γ} {a : Tm Γ A} : (@Subst.left �
 
 theorem Subst.left_apply' {Γ : Con} {A B : Ty Γ} {a : Tm Γ A} {Mot : Ty _} : Mot[@Subst.left Γ A B][.apply a] = Mot[.apply (.left a)] := by sorry
 
+set_option backward.isDefEq.respectTransparency false in
 /-- `wki ∘ ⟨σ, a⟩ = σ` -/
 @[simp, grind =, aesop safe] theorem Subst.comp_wki_cons : Subst.wki ∘ (σ ;; t) = σ := by
   let ⟨σ, σw⟩ := σ
@@ -287,6 +289,7 @@ theorem Subst.left_apply' {Γ : Con} {A B : Ty Γ} {a : Tm Γ A} {Mot : Ty _} : 
 -- @[irreducible]
 def Tm.letE {Γ : Con} {A B : Ty Γ} (val : Tm Γ A) (body : Tm (Γ.ext A) (B.subst .wki)) : Tm Γ B     := body.subst (.apply val) |>.conv (.ofEq Ty.subst_wki_apply)
 
+set_option backward.isDefEq.respectTransparency false in
 @[grind =, aesop 20%] theorem Subst.comp_lift_apply {σ : Subst Γ Δ} : lift σ ∘ apply a[σ] = apply a ∘ σ := by
   rw [apply]
   rw [apply]
