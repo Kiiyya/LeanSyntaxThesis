@@ -21,6 +21,7 @@ def ConConv (Γ Δ : Con) : Prop   := ConWConv Γ.2.1 Δ.2.1
 def TyConv (A B : Ty Γ) : Prop   := TyWConv Γ.2.1 A.1 B.1
 def TmConv (t u : Tm Γ A) : Prop := TmWConv Γ.2.1 A.1 t.1 u.1
 
+
 def Con.len (Γ : Con) : Nat := Γ.1
 def Con.e (Γ : Con) : ConE Γ.len := Γ.2.1
 def Con.w (Γ : Con) : ConW Γ.e := Γ.2.2
@@ -72,6 +73,7 @@ def Ty.conv {Γ₁ Γ₂ : Con} (Γc : ConConv Γ₁ Γ₂) (A : Ty Γ₁) : Ty 
   ⟩
 
 @[aesop 10%] theorem TyConv.ofEq {A B : Ty Γ} (h : A = B) : TyConv A B := h ▸ TyWConv.refl Γ.2.2 A.2
+@[aesop 10%] theorem TmConv.ofEq {x y : Tm Γ A} (h : x = y) : TmConv x y := h ▸ TmWConv.refl Γ.2.2 A.2 x.2
 instance {Γ} {A B : Ty Γ} : Coe (Eq A B) (TyConv A B) := ⟨.ofEq⟩
 
 @[aesop forward 1%] theorem Ty.cast {Γ Δ : Con} (h : ConConv Γ Δ) : Ty Γ = Ty Δ := by
@@ -306,6 +308,8 @@ set_option backward.isDefEq.respectTransparency false in
   grind only [= Subst.comp_cons, = subst_comp, = Subst.lift_eq, =_ subst_wk, =_ Subst.comp_wk,
     = Subst.comp_lift_apply]
 
+theorem TyConv.subst_lift_apply {σ : Subst Γ Δ} {A} {B : Ty (Δ; A)} {a} : TyConv B[lift σ][.apply a[σ]] B[.apply a][σ] := .ofEq Ty.subst_lift_apply
+
 @[simp, grind =, aesop norm] theorem Ty.U_subst : (Ty.U)[σ] = .U := rfl
 @[grind =, aesop 90%] theorem Ty.El_subst : (Ty.El t)[σ] = Ty.El t[σ] := rfl
 @[grind =, aesop 90%] theorem Ty.Pi_subst : (Ty.Pi A B)[σ] = Ty.Pi A[σ] B[.lift σ] := rfl
@@ -346,6 +350,7 @@ end SubstTheorems
   ## Computation Rules
 -/
 
+def ConConv.refl : ConConv Γ Γ := ConWConv.refl Γ.2.2
 def ConConv.ext' {A A' : Ty Γ} (Ac : TyConv A A') : ConConv (.ext Γ A) (.ext Γ A') := ConWConv.ext (.refl Γ.2.2) Ac
 
 @[aesop 10%] def TyConv.symm : TyConv x y -> TyConv y x := TyWConv.symm
@@ -487,3 +492,58 @@ end ConvImplicit
 theorem Ty.Pi.inj {Γ : Con} {A₁ A₂ : Ty Γ} {B₁ : Ty (Γ.ext A₁)} {B₂ : Ty (Γ.ext A₂)}
   : TyConv (.Pi A₁ B₁) (.Pi A₂ B₂) -> ∃Ac : TyConv A₁ A₂, TyConv B₁ (B₂.conv (ConConv.ext' Ac.symm))
   := by sorry
+
+section HConv
+  variable {Γ : Con} {X Y : Ty Γ} {x : Tm Γ X} {y : Tm Γ Y}
+
+  structure TmHConv (x : Tm Γ X) (y : Tm Γ Y) : Prop where
+    tyConv : TyConv X Y
+    tmConv : TmWConv Γ.2.1 X.1 x.1 y.1
+
+  def TmConv.toTmHConv {x : Tm Γ X} {y : Tm Γ X} (c : TmConv x y) : TmHConv x y where
+    tyConv := TyWConv.refl Γ.2.2 X.2
+    tmConv := c
+
+  def TmHConv.toTmConv (c : TmHConv x y) : TmConv x (y.conv c.tyConv.symm) := c.tmConv
+  -- def TmHConv.toTmConv (c : TmHConv x y) : TmConv x (y.conv h) := c.tmConv -- this is also provable, and is the same statement anyway due to proof irrel
+
+  def TmHConv.refl : @TmHConv Γ X X x x where
+    tyConv := .refl
+    tmConv := .refl Γ.2.2 X.2 x.2
+
+  def TmHConv.symm (c : TmHConv x y) : @TmHConv Γ Y X y x where
+    tyConv := c.tyConv.symm
+    tmConv :=
+      let res := c.tmConv.symm
+      res.conv (.refl Γ) c.tyConv
+
+  def TmHConv.trans {X Y Z} {x y z} (xy : @TmHConv Γ X Y x y) (yz : @TmHConv Γ Y Z y z) : @TmHConv Γ X Z x z where
+    tyConv := xy.tyConv.trans yz.tyConv
+    tmConv :=
+      let tyConv := xy.tyConv.trans yz.tyConv
+      let c : TyWConv Γ.2.1 Y.1 X.1 := xy.symm.tyConv
+      let res : TmWConv Γ.2.1 X.1 x.1 z.1 := xy.tmConv.trans (yz.tmConv |>.conv (.refl Γ) c)
+      res
+
+  def TmConv.toTmHConv_R {x : Tm Γ X} {y : Tm Γ Y} (c : TmConv x (y.conv cTy)) : TmHConv x y where
+    tyConv := cTy.symm
+    tmConv := c
+
+  def TmConv.toTmHConv_L {x : Tm Γ X} {y : Tm Γ Y} (c : TmConv (x.conv cTy) y) : TmHConv x y :=
+    (c.symm |>.toTmHConv_R) |>.symm
+
+  def TmHConv.ofConvTy (x : Tm Γ X) (c : TyConv X Y) : @TmHConv Γ X Y x (x.conv c) where
+    tyConv := c
+    tmConv := .refl Γ.2.2 X.2 x.2
+
+  def TmHConv.subst {Γ Δ : Con} {X Y : Ty Δ} {x y} (h : @TmHConv Δ X Y x y) (σ : Subst Γ Δ)
+    : @TmHConv Γ X[σ] Y[σ] x[σ] y[σ]
+    := sorry
+
+  theorem TmHConv.app_subst {Γ Δ A B f a} {σ : Subst Γ Δ}
+  : TmHConv (@Tm.app Δ A B f a)[σ] (@Tm.app Γ A[σ] B[.lift σ] f[σ] a[σ])
+  where
+    tyConv := .ofEq Ty.subst_lift_apply.symm
+    tmConv := sorry
+
+end HConv

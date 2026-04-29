@@ -336,7 +336,7 @@ set_option linter.unusedTactic false
 
 open DershowitzManna in
 mutual
-  unsafe def Con.recL' (m : MethodsL) (Γe : ConE γ) (Γw : ConW Γe) : m.ConM ⟨γ, Γe, Γw⟩ :=
+  def Con.recL' (m : MethodsL) (Γe : ConE γ) (Γw : ConW Γe) : m.ConM ⟨γ, Γe, Γw⟩ :=
     match γ, Γe with
     | .zero, .nil => m.nilM
     | .succ γ, .ext Γe Ae =>
@@ -346,7 +346,7 @@ mutual
     . exact lift_lt .extTail
     . exact lift_lt_2 .extTail .extHead
 
-  unsafe def Ty.recL' (m : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} (Xe : TyE γ) (Xw : TyW Γe Xe) : m.TyM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ :=
+  def Ty.recL' (m : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} (Xe : TyE γ) (Xw : TyW Γe Xe) : m.TyM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ :=
     match Xe with
     | .U => m.UM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw)
     | .Pi Ae Be =>
@@ -369,14 +369,15 @@ mutual
         _ << {.ty (.ext Γe Ae) Be, .ty (.ext Γe Ae) Be} := by sorry
         _ << {.ty Γe (TyE.Pi Ae Be)} := by sorry
         _ << {.con Γe, ConTyTmE.ty Γe (TyE.Pi Ae Be)} := by sorry
-    . aesop
+    . apply DershowitzManna.proj_2_1
     . calc {ConTyTmE.con Γe, .ty Γe TyE.U, .tm Γe TyE.U te}
         _ << {.con Γe, .ty Γe (.El te)} := sorry -- from .ElU, .ElTerm
-    . aesop
+    . apply DershowitzManna.proj_2_1
+    . sorry -- easy
     . sorry -- easy
     . sorry -- easy
 
-  unsafe def Tm.recL' (m : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} {Xe : TyE γ} {Xw : TyW Γe Xe} (te : TmE γ) (tw : TmW Γe Xe te) : m.TmM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ ⟨te, tw⟩ :=
+  def Tm.recL' (m : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} {Xe : TyE γ} {Xw : TyW Γe Xe} (te : TmE γ) (tw : TmW Γe Xe te) : m.TmM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ ⟨te, tw⟩ :=
     match te with
     | .var ve =>
       let vw := TmW.var_wf tw
@@ -407,7 +408,7 @@ mutual
   termination_by ({ .con Γe, .ty Γe Xe, .tm Γe Xe te } : Multiset ConTyTmE)
   decreasing_by all_goals sorry
 
-  unsafe def Var.recL' (d : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} {Xe : TyE γ} {Xw : TyW Γe Xe} (ve : VarE γ) (vw : VarW Γe Xe ve) : d.VarM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ ⟨ve, vw⟩ :=
+  def Var.recL' (d : MethodsL) {Γe : ConE γ} {Γw : ConW Γe} {Xe : TyE γ} {Xw : TyW Γe Xe} (ve : VarE γ) (vw : VarW Γe Xe ve) : d.VarM ⟨γ, Γe, Γw⟩ ⟨Xe, Xw⟩ ⟨ve, vw⟩ :=
     let γ + 1 := γ
     let .ext Γe Be := Γe
     let Bw := Γw.ext_Aw
@@ -428,17 +429,12 @@ mutual
   decreasing_by all_goals sorry
 end
 
--- Absolutely no clue why this is necessary, but without it, the `*.*_iota'` rules below break.
-#eval Lean.enableRealizationsForConst ``Con.recL'
-#eval Lean.enableRealizationsForConst ``Ty.recL'
-#eval Lean.enableRealizationsForConst ``Tm.recL'
-#eval Lean.enableRealizationsForConst ``Var.recL'
-
 section Iota'
   set_option allowUnsafeReducibility true
+  -- set_option backward.isDefEq.respectTransparency false
+  set_option maxRecDepth 7000
 
-  /-
-    # Iota rules
+  /- # Iota rules
     As far as I can tell, these are theoretically definitional equalities. But Lean runs out of stack space.
   -/
 
@@ -447,62 +443,23 @@ section Iota'
   variable (Ae : TyE γ) (Aw : TyW Γe Ae)
   variable (Be : TyE (.succ γ)) (Bw : TyW (.ext Γe Ae) Be)
 
-  @[defeq, simp] unsafe def Con.nil_iota' : Con.recL' m .nil .nil = m.nilM := rfl
+  def Con.nil_iota' : Con.recL' m .nil .nil = m.nilM := by rw [Con.recL']
+  def Con.ext_iota' : Con.recL' m (.ext Γe Ae) (.ext Γw Aw) = m.extM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw)
+    := by rw [Con.recL'.eq_2]
+  attribute [irreducible] Con.recL'
 
-  unsafe def _Con.ext_iota' : Con.recL' m (.ext Γe Ae) (.ext Γw Aw) = m.extM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw)
-    := by rw [Con.recL']
-
-  -- *** This is tagged as `@[defeq]`:
-  #print Con.recL'.eq_2
-  -- *** Therefore, this is also a defeq:
-  set_option maxRecDepth 7000
-  set_option pp.all true in
-  -- @[defeq] -- uncommenting this also crashes lean due to stack space.
-  unsafe def Con.ext_iota' : Con.recL' m (.ext Γe Ae) (.ext Γw Aw) = m.extM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw)
-    :=
-      -- let Γ : Con := ⟨γ, Γe, Γw⟩
-      -- let A : Ty Γ := ⟨Ae, Aw⟩
-      -- let lhs : Con := Con.ext Γ A -- even just this exceeds the stack
-
-      -- `show_term` shows a proof by `Eq.refl`!
-      show_term by dsimp [Con.recL'.eq_2]
-      /- However, copy-pasting this term here explodes the stack space:
-        ```
-        := @Eq.refl.{u_1}
-          (MotivesL.ConM.{u_1} (MethodsL.toMotivesL.{u_1} m)
-            (Con.ext
-              (@Sigma.mk.{0, 0} Nat
-                (fun (γ : Nat) => @Subtype.{1} (ConE γ) fun (Γ : ConE γ) => @ConW γ Γ) γ
-                (@Subtype.mk.{1} (ConE γ) (fun (Γ : ConE γ) => @ConW γ Γ) Γe
-                  (@ConW.ext_Γw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw))))
-              (@Subtype.mk.{1} (TyE γ) (fun (A : TyE γ) => @TyW γ Γe A) Ae
-                (@ConW.ext_Aw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw)))))
-          (MethodsL.extM.{u_1} m
-            (@Sigma.mk.{0, 0} Nat (fun (γ : Nat) => @Subtype.{1} (ConE γ) fun (Γ : ConE γ) => @ConW γ Γ)
-              γ
-              (@Subtype.mk.{1} (ConE γ) (fun (Γ : ConE γ) => @ConW γ Γ) Γe
-                (@ConW.ext_Γw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw))))
-            (@Con.recL'.{u_1} γ m Γe (@ConW.ext_Γw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw)))
-            (@Subtype.mk.{1} (TyE γ) (fun (A : TyE γ) => @TyW γ Γe A) Ae
-              (@ConW.ext_Aw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw)))
-            (@Ty.recL'.{u_1} γ m Γe (@ConW.ext_Γw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw)) Ae
-              (@ConW.ext_Aw γ Γe Ae (@ConW.ext γ Γe Ae Γw Aw))))
-        ``` -/
-
-  @[defeq, simp]
-  unsafe def Ty.U_iota' : Ty.recL' m .U (.U Γw) = m.UM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) := rfl
-  unsafe def _Ty.Pi_iota' : Ty.recL' m (.Pi Ae Be) (.Pi Γw Aw Bw)
-    = m.PiM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw) ⟨Be, Bw⟩ (Ty.recL' m Be Bw)
-    := by rw [Ty.recL']
-  #print Ty.recL'.eq_5 -- ** All the Ty.recL'.eq_* are tagged as `@[defeq]`
-  -- Therefore, this is actually a definitional equality:
-  unsafe def Ty.Pi_iota' : Ty.recL' m (.Pi Ae Be) (.Pi Γw Aw Bw)
+  def Ty.U_iota' : Ty.recL' m .U (.U Γw) = m.UM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) := by rw [Ty.recL']
+  def Ty.El_iota' : Ty.recL' m (.El te) (.El Γw tw) = m.ElM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨te, tw⟩ (Tm.recL' m te tw)
+    := by rw [Ty.recL'.eq_3]
+  def Ty.Pi_iota' : Ty.recL' m (.Pi Ae Be) (.Pi Γw Aw Bw)
     = m.PiM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw) ⟨Be, Bw⟩ (Ty.recL' m Be Bw)
     := by rw [Ty.recL'.eq_2]
-
-  -- Seal them. This help avoid recursion depth errors
-  attribute [irreducible] Con.recL'
   attribute [irreducible] Ty.recL'
+
+  def Tm.var_iota' : Tm.recL' m (.var ve) (.var Γw Aw vw)
+    = m.varM ⟨γ, Γe, Γw⟩ (Con.recL' m Γe Γw) ⟨Ae, Aw⟩ (Ty.recL' m Ae Aw) ⟨Be, Bw⟩ (Ty.recL' m Be Bw)
+    := by rw [Ty.recL'.eq_2]
+
   attribute [irreducible] Tm.recL'
   attribute [irreducible] Var.recL'
 end Iota'
@@ -512,17 +469,16 @@ section Iota
 
   variable (m : MethodsL) (Γ : Con) (A : Ty Γ) (B : Ty (.ext Γ A))
 
-  unsafe def Con.recL (m : MethodsL) (Γ : Con) : m.ConM Γ := Con.recL' (γ := Γ.1) m Γ.2.1 Γ.2.2
-  unsafe def Ty.recL (m : MethodsL) {Γ : Con} (A : Ty Γ) : m.TyM Γ A := Ty.recL' m A.1 A.2
-  unsafe def Tm.recL (m : MethodsL) {Γ : Con} {A : Ty Γ} (t : Tm Γ A) : m.TmM Γ A t := Tm.recL' m t.1 t.2
-  unsafe def Var.recL (m : MethodsL) {Γ : Con} {A : Ty Γ} (v : Var Γ A) : m.VarM Γ A v := Var.recL' m v.1 v.2
+  def Con.recL (m : MethodsL) (Γ : Con) : m.ConM Γ := Con.recL' (γ := Γ.1) m Γ.2.1 Γ.2.2
+  def Ty.recL (m : MethodsL) {Γ : Con} (A : Ty Γ) : m.TyM Γ A := Ty.recL' m A.1 A.2
+  def Tm.recL (m : MethodsL) {Γ : Con} {A : Ty Γ} (t : Tm Γ A) : m.TmM Γ A t := Tm.recL' m t.1 t.2
+  def Var.recL (m : MethodsL) {Γ : Con} {A : Ty Γ} (v : Var Γ A) : m.VarM Γ A v := Var.recL' m v.1 v.2
 
-  unsafe def Con.nil_iota : Con.recL M .nil = M.nilM := Con.nil_iota' ..
-  unsafe def Con.ext_iota : Con.recL M (.ext Γ A) = M.extM Γ (Con.recL M Γ) A (Ty.recL M A) :=
-    Con.ext_iota' M Γ.2.1 Γ.2.2 A.1 A.2 -- requires `Ty.recL'` to be irreducible
+  def Con.nil_iota : Con.recL m .nil = m.nilM := Con.nil_iota' ..
+  def Con.ext_iota : Con.recL m (.ext Γ A) = m.extM Γ (Con.recL m Γ) A (Ty.recL m A) := Con.ext_iota' ..
 
-  unsafe def Ty.U_iota : Ty.recL m .U = m.UM Γ (Con.recL m Γ) := Ty.U_iota' ..
-  unsafe def Ty.Pi_iota : Ty.recL m (.Pi A B) = m.PiM Γ (Con.recL m Γ) A (Ty.recL m A) B (Ty.recL m B) := Ty.Pi_iota' ..
+  def Ty.U_iota : Ty.recL m .U = m.UM Γ (Con.recL m Γ) := Ty.U_iota' ..
+  def Ty.Pi_iota : Ty.recL m (.Pi A B) = m.PiM Γ (Con.recL m Γ) A (Ty.recL m A) B (Ty.recL m B) := Ty.Pi_iota' ..
 
   attribute [irreducible] Con.recL
   attribute [irreducible] Ty.recL
